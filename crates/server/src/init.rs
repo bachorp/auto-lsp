@@ -19,9 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
-use super::task_pool::TaskPool;
 use super::InitOptions;
 use super::Session;
+use super::task_pool::TaskPool;
 use auto_lsp_core::errors::{ExtensionError, RuntimeError};
 use lsp_server::{Connection, ReqQueue};
 use lsp_types::{InitializeParams, InitializeResult, PositionEncodingKind};
@@ -36,7 +36,7 @@ struct InitializationOptions {
     ///
     /// Example: { "rs": "rust", "py": "python" }
     /// This option is provided by the client to define how different file types should be parsed.
-    perFileParser: HashMap<String, String>,
+    perFileParser: Option<HashMap<String, String>>,
 }
 
 impl<Db: salsa::Database> Session<Db> {
@@ -61,7 +61,7 @@ impl<Db: salsa::Database> Session<Db> {
             init_options,
             encoding,
             connection,
-            extensions: HashMap::new(),
+            extensions: None,
             req_queue: ReqQueue::default(),
             db,
             task_rx,
@@ -100,27 +100,29 @@ impl<Db: salsa::Database> Session<Db> {
 
         let mut session = Session::new(init_options, connection, db);
 
-        let options = InitializationOptions::deserialize(
-            params
-                .clone()
-                .initialization_options
-                .ok_or(RuntimeError::MissingPerFileParser)?,
-        )
-        .unwrap();
-
-        // Validate that the parsers provided by the client exist
-        for (file_extension, parser) in &options.perFileParser {
-            if !session.init_options.parsers.contains_key(parser.as_str()) {
-                return Err(RuntimeError::from(ExtensionError::UnknownParser {
-                    extension: file_extension.clone(),
-                    available: session.init_options.parsers.keys().cloned().collect(),
-                })
-                .into());
-            }
-        }
-
         // Store the client's per file parser options
-        session.extensions = options.perFileParser;
+        session.extensions = match params.initialization_options.clone() {
+            None => None,
+            Some(i) => {
+                if let InitializationOptions {
+                    perFileParser: Some(perFileParser),
+                } = InitializationOptions::deserialize(i).unwrap()
+                {
+                    for (file_extension, parser) in &perFileParser {
+                        if !session.init_options.parsers.contains_key(parser.as_str()) {
+                            return Err(RuntimeError::from(ExtensionError::UnknownParser {
+                                extension: file_extension.clone(),
+                                available: session.init_options.parsers.keys().cloned().collect(),
+                            })
+                            .into());
+                        }
+                    }
+                    Some(perFileParser)
+                } else {
+                    None
+                }
+            }
+        };
 
         Ok((session, params))
     }
