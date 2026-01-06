@@ -278,28 +278,39 @@ impl File {
         session: &Session<impl salsa::Database>,
         extension: &str,
     ) -> Result<&'static Parsers, RuntimeError> {
-        // Check if the extension is registered
-        let extension = match session.extensions.get(extension) {
-            Some(extension) => extension,
-            None => {
-                if session.extensions.values().any(|x| x == extension) {
-                    extension
-                } else {
-                    return Err(ExtensionError::UnknownExtension {
-                        extension: extension.to_string(),
-                        available: session.extensions.clone(),
+        match &session.extensions {
+            None => match session.init_options.parsers.len() {
+                1 => Ok(session.init_options.parsers.iter().next().unwrap().1),
+                _ => Err(RuntimeError::from(ExtensionError::UnknownParser {
+                    extension: extension.to_string(),
+                    available: session.init_options.parsers.keys().cloned().collect(),
+                })),
+            },
+            Some(extensions) => {
+                // Check if the extension is registered
+                let extension = match extensions.get(extension) {
+                    Some(extension) => extension,
+                    None => {
+                        if extensions.values().any(|x| x == extension) {
+                            extension
+                        } else {
+                            return Err(ExtensionError::UnknownExtension {
+                                extension: extension.to_string(),
+                                available: extensions.clone(),
+                            }
+                            .into());
+                        }
                     }
-                    .into());
-                }
-            }
-        };
+                };
 
-        // Check if the parser for this extension is available
-        session.init_options.parsers.get(extension).ok_or_else(|| {
-            RuntimeError::from(ExtensionError::UnknownParser {
-                extension: extension.to_string(),
-                available: session.init_options.parsers.keys().cloned().collect(),
-            })
-        })
+                // Check if the parser for this extension is available
+                session.init_options.parsers.get(extension).ok_or_else(|| {
+                    RuntimeError::from(ExtensionError::UnknownParser {
+                        extension: extension.to_string(),
+                        available: session.init_options.parsers.keys().cloned().collect(),
+                    })
+                })
+            }
+        }
     }
 }

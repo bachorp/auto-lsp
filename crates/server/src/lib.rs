@@ -45,7 +45,7 @@ pub struct Session<Db: salsa::Database> {
     /// The client is responsible for providing the encoding at initialization (UTF-8, 16 or 32).
     pub encoding: lsp_types::PositionEncodingKind,
     /// Language extensions to parser mappings.
-    pub extensions: HashMap<String, String>,
+    pub extensions: Option<HashMap<String, String>>,
     pub(crate) task_receiver: crossbeam_channel::Receiver<Task>,
     pub(crate) task_sender: crossbeam_channel::Sender<Task>,
     pub task_pool: vendored::pool::Pool,
