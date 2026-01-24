@@ -62,7 +62,6 @@ impl From<&ParseError> for lsp_types::Diagnostic {
             range: range.into(),
             severity: Some(lsp_types::DiagnosticSeverity::ERROR),
             message,
-            code: Some(lsp_types::NumberOrString::String("AUTO_LSP".into())),
             ..Default::default()
         }
     }
